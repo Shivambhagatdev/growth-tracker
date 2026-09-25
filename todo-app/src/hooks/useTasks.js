@@ -52,6 +52,11 @@ function useTasks() {
 
   });
 
+
+  // =========================
+  // SAVE TASKS
+  // =========================
+
   useEffect(() => {
 
     localStorage.setItem(
@@ -60,6 +65,11 @@ function useTasks() {
     );
 
   }, [tasks]);
+
+
+  // =========================
+  // SAVE STREAK
+  // =========================
 
   useEffect(() => {
 
@@ -77,6 +87,95 @@ function useTasks() {
     streak,
     lastCompletedDate
   ]);
+
+
+  // =========================
+  // CARRY FORWARD INCOMPLETE TASKS
+  // =========================
+
+  useEffect(() => {
+
+    const checkNewDay = () => {
+
+      const currentDate =
+        getTodayDate();
+
+
+      setTasks((prevTasks) => {
+
+        let changed = false;
+
+
+        const updatedTasks =
+          prevTasks.map((item) => {
+
+            if (
+              item.date === currentDate
+            ) {
+
+              return item;
+
+            }
+
+
+            if (
+              item.completed
+            ) {
+
+              return item;
+
+            }
+
+
+            changed = true;
+
+
+            return {
+
+              ...item,
+
+              date:
+                currentDate,
+
+              dueDate:
+                currentDate,
+
+            };
+
+          });
+
+
+        return changed
+          ? updatedTasks
+          : prevTasks;
+
+      });
+
+    };
+
+
+    checkNewDay();
+
+
+    const interval =
+      setInterval(
+        checkNewDay,
+        60 * 1000
+      );
+
+
+    return () => {
+
+      clearInterval(interval);
+
+    };
+
+  }, []);
+
+
+  // =========================
+  // ADD TASK
+  // =========================
 
   const addTask = () => {
 
@@ -115,6 +214,11 @@ function useTasks() {
     setDueDate(getTodayDate());
 
   };
+
+
+  // =========================
+  // UPDATE STREAK
+  // =========================
 
   const updateStreak = () => {
 
@@ -186,6 +290,11 @@ function useTasks() {
 
   };
 
+
+  // =========================
+  // TOGGLE TASK
+  // =========================
+
   const toggleTask = (id) => {
 
     setTasks((prevTasks) =>
@@ -226,6 +335,11 @@ function useTasks() {
 
   };
 
+
+  // =========================
+  // DELETE TASK
+  // =========================
+
   const deleteTask = (id) => {
 
     setTasks((prevTasks) =>
@@ -239,6 +353,11 @@ function useTasks() {
 
   };
 
+
+  // =========================
+  // START EDIT
+  // =========================
+
   const startEdit = (item) => {
 
     setEditingTaskId(
@@ -250,6 +369,11 @@ function useTasks() {
     );
 
   };
+
+
+  // =========================
+  // SAVE EDIT
+  // =========================
 
   const saveEdit = (id) => {
 
@@ -292,6 +416,11 @@ function useTasks() {
 
   };
 
+
+  // =========================
+  // CANCEL EDIT
+  // =========================
+
   const cancelEdit = () => {
 
     setEditingTaskId(null);
@@ -299,6 +428,11 @@ function useTasks() {
     setEditText("");
 
   };
+
+
+  // =========================
+  // RETURN
+  // =========================
 
   return {
 
