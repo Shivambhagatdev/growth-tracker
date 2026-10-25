@@ -1,505 +1,215 @@
+
 import { useEffect, useState } from "react";
 import getTodayDate from "../utils/date";
 
+const DEFAULT_GOALS = [
+  { id: 1, text: "Coding", icon: "💻", completed: false, completedDate: "" },
+  { id: 2, text: "Study", icon: "📚", completed: false, completedDate: "" },
+  { id: 3, text: "Exercise", icon: "🏋️", completed: false, completedDate: "" },
+  { id: 4, text: "Reading", icon: "📖", completed: false, completedDate: "" },
+];
+
 function useGoal() {
-
-  // =========================
-  // GOAL INPUT
-  // =========================
-
-  const [goalText, setGoalText] =
-    useState("");
-
-
-  // =========================
-  // GOALS
-  // =========================
+  const [goalText, setGoalText] = useState("");
 
   const [goals, setGoals] = useState(() => {
+    try {
+      const savedGoals = localStorage.getItem("growthGoals");
 
-    const savedGoals =
-      localStorage.getItem("growthGoals");
+      if (!savedGoals) return DEFAULT_GOALS;
 
-    const today =
-      getTodayDate();
-
-    if (savedGoals) {
-
-      const parsedGoals =
-        JSON.parse(savedGoals);
+      const parsedGoals = JSON.parse(savedGoals);
+      const today = getTodayDate();
 
       return parsedGoals.map((goal) => {
-
-        if (
-          goal.completedDate !== today
-        ) {
-
+        if (goal.completedDate !== today) {
           return {
-
             ...goal,
-
             completed: false,
-
             completedDate: "",
-
           };
-
         }
 
         return goal;
-
       });
-
+    } catch (error) {
+      console.error("Error loading goals:", error);
+      return DEFAULT_GOALS;
     }
-
-
-    return [
-
-      {
-        id: 1,
-        text: "Coding",
-        icon: "💻",
-        completed: false,
-        completedDate: "",
-      },
-
-      {
-        id: 2,
-        text: "Study",
-        icon: "📚",
-        completed: false,
-        completedDate: "",
-      },
-
-      {
-        id: 3,
-        text: "Exercise",
-        icon: "🏋️",
-        completed: false,
-        completedDate: "",
-      },
-
-      {
-        id: 4,
-        text: "Reading",
-        icon: "📖",
-        completed: false,
-        completedDate: "",
-      },
-
-    ];
-
   });
 
+  const [goalHistory, setGoalHistory] = useState(() => {
+    try {
+      const savedHistory = localStorage.getItem("growthGoalHistory");
+      return savedHistory ? JSON.parse(savedHistory) : {};
+    } catch (error) {
+      console.error("Error loading goal history:", error);
+      return {};
+    }
+  });
 
-  // =========================
-  // GOAL HISTORY
-  // =========================
-
-  const [goalHistory, setGoalHistory] =
-    useState(() => {
-
-      const savedHistory =
-        localStorage.getItem(
-          "growthGoalHistory"
-        );
-
-      return savedHistory
-        ? JSON.parse(savedHistory)
-        : {};
-
-    });
-
-
-  // =========================
-  // SAVE GOALS
-  // =========================
-
+  // Save goals whenever they change
   useEffect(() => {
-
-    localStorage.setItem(
-      "growthGoals",
-      JSON.stringify(goals)
-    );
-
+    localStorage.setItem("growthGoals", JSON.stringify(goals));
   }, [goals]);
 
-
-  // =========================
-  // SAVE GOAL HISTORY
-  // =========================
-
+  // Save history whenever it changes
   useEffect(() => {
-
     localStorage.setItem(
       "growthGoalHistory",
       JSON.stringify(goalHistory)
     );
-
   }, [goalHistory]);
 
-
-  // =========================
-  // NEW DAY HANDLING
-  // =========================
-
+  // Reset today's completion status when a new day begins
   useEffect(() => {
-
     const checkNewDay = () => {
+      const today = getTodayDate();
 
-      const currentDate =
-        getTodayDate();
+      setGoals((previousGoals) => {
+        const updatedGoals = previousGoals.map((goal) => {
+          if (goal.completedDate !== today) {
+            return {
+              ...goal,
+              completed: false,
+              completedDate: "",
+            };
+          }
 
+          return goal;
+        });
 
-      setGoals((prevGoals) => {
-
-        let changed = false;
-
-
-        const updatedGoals =
-          prevGoals.map((goal) => {
-
-            if (
-              goal.completedDate !==
-              currentDate
-            ) {
-
-              if (
-                goal.completed ||
-                goal.completedDate !== ""
-              ) {
-
-                changed = true;
-
-              }
-
-
-              return {
-
-                ...goal,
-
-                completed: false,
-
-                completedDate: "",
-
-              };
-
-            }
-
-
-            return goal;
-
-          });
-
-
-        return changed
-          ? updatedGoals
-          : prevGoals;
-
+        return updatedGoals;
       });
-
     };
-
 
     checkNewDay();
 
+    const interval = setInterval(checkNewDay, 60 * 1000);
 
-    const interval =
-      setInterval(
-        checkNewDay,
-        60 * 1000
-      );
-
-
-    return () => {
-
-      clearInterval(interval);
-
-    };
-
+    return () => clearInterval(interval);
   }, []);
 
-
-  // =========================
-  // ADD GOAL
-  // =========================
-
+  // Add a new goal
   const addGoal = (selectedIcon = "🎯") => {
+    const trimmedText = goalText.trim();
 
-    if (
-      goalText.trim() === ""
-    ) {
+    if (!trimmedText) return;
 
-      return;
-
-    }
-
-
-    const currentDate =
-      getTodayDate();
-
+    const today = getTodayDate();
 
     const newGoal = {
-
       id: Date.now(),
-
-      text:
-        goalText.trim(),
-
-      icon:
-        selectedIcon,
-
+      text: trimmedText,
+      icon: selectedIcon,
       completed: false,
-
       completedDate: "",
-
     };
 
+    const updatedGoals = [...goals, newGoal];
 
-    setGoals((prevGoals) => {
+    setGoals(updatedGoals);
 
-      const newGoals = [
+    setGoalHistory((previousHistory) => {
+      const previousRecord = previousHistory[today];
 
-        ...prevGoals,
-
-        newGoal,
-
-      ];
-
-
-      setGoalHistory(
-        (prevHistory) => {
-
-          const currentDay =
-            prevHistory[currentDate] || {
-
-              total:
-                prevGoals.length,
-
-              completed:
-                prevGoals.filter(
-                  (goal) =>
-                    goal.completed
-                ).length,
-
-            };
-
-
-          return {
-
-            ...prevHistory,
-
-            [currentDate]: {
-
-              ...currentDay,
-
-              total:
-                newGoals.length,
-
-            },
-
-          };
-
-        }
-      );
-
-
-      return newGoals;
-
+      return {
+        ...previousHistory,
+        [today]: {
+          total: updatedGoals.length,
+          completed: previousRecord
+            ? updatedGoals.filter((goal) => goal.completed).length
+            : updatedGoals.filter((goal) => goal.completed).length,
+        },
+      };
     });
-
 
     setGoalText("");
-
   };
 
-
-  // =========================
-  // TOGGLE GOAL
-  // =========================
-
+  // Mark a goal complete or incomplete
   const toggleGoal = (id) => {
+    const today = getTodayDate();
 
-    const currentDate =
-      getTodayDate();
+    const targetGoal = goals.find((goal) => goal.id === id);
 
+    if (!targetGoal) return;
 
-    setGoals((prevGoals) => {
+    const newCompleted = !targetGoal.completed;
 
-      const targetGoal =
-        prevGoals.find(
-          (goal) =>
-            goal.id === id
-        );
+    const updatedGoals = goals.map((goal) => {
+      if (goal.id !== id) return goal;
 
-
-      if (!targetGoal) {
-
-        return prevGoals;
-
-      }
-
-
-      const newCompleted =
-        !targetGoal.completed;
-
-
-      setGoalHistory(
-        (prevHistory) => {
-
-          const currentDay =
-            prevHistory[currentDate] || {
-
-              total:
-                prevGoals.length,
-
-              completed:
-                prevGoals.filter(
-                  (goal) =>
-                    goal.completed
-                ).length,
-
-            };
-
-
-          let newCompletedCount =
-            currentDay.completed;
-
-
-          if (newCompleted) {
-
-            newCompletedCount =
-              currentDay.completed + 1;
-
-          } else {
-
-            newCompletedCount =
-              Math.max(
-                0,
-                currentDay.completed - 1
-              );
-
-          }
-
-
-          return {
-
-            ...prevHistory,
-
-            [currentDate]: {
-
-              total:
-                currentDay.total,
-
-              completed:
-                newCompletedCount,
-
-            },
-
-          };
-
-        }
-      );
-
-
-      return prevGoals.map((goal) => {
-
-        if (
-          goal.id === id
-        ) {
-
-          return {
-
-            ...goal,
-
-            completed:
-              newCompleted,
-
-            completedDate:
-              newCompleted
-                ? currentDate
-                : "",
-
-          };
-
-        }
-
-
-        return goal;
-
-      });
-
+      return {
+        ...goal,
+        completed: newCompleted,
+        completedDate: newCompleted ? today : "",
+      };
     });
 
-  };
-
-
-  // =========================
-  // DELETE GOAL
-  // =========================
-
-  const deleteGoal = (id) => {
-
-    setGoals((prevGoals) =>
-
-      prevGoals.filter(
-        (goal) =>
-          goal.id !== id
-      )
-
-    );
-
-  };
-
-
-  // =========================
-  // COMPLETED GOALS
-  // =========================
-
-  const completedGoals =
-    goals.filter(
-      (goal) =>
-        goal.completed
+    const completedCount = updatedGoals.filter(
+      (goal) => goal.completed
     ).length;
 
+    setGoals(updatedGoals);
 
-  // =========================
-  // GOAL PROGRESS
-  // =========================
+    setGoalHistory((previousHistory) => ({
+      ...previousHistory,
+      [today]: {
+        total: updatedGoals.length,
+        completed: completedCount,
+      },
+    }));
+  };
+
+  // Delete a goal
+  const deleteGoal = (id) => {
+    const today = getTodayDate();
+
+    const updatedGoals = goals.filter((goal) => goal.id !== id);
+
+    setGoals(updatedGoals);
+
+    setGoalHistory((previousHistory) => {
+      const existingRecord = previousHistory[today];
+
+      // Update today's record without deleting older history
+      if (!existingRecord) {
+        return previousHistory;
+      }
+
+      return {
+        ...previousHistory,
+        [today]: {
+          total: updatedGoals.length,
+          completed: updatedGoals.filter(
+            (goal) => goal.completed
+          ).length,
+        },
+      };
+    });
+  };
+
+  const completedGoals = goals.filter(
+    (goal) => goal.completed
+  ).length;
 
   const goalProgress =
     goals.length === 0
       ? 0
-      : Math.round(
-          (completedGoals /
-            goals.length) *
-            100
-        );
-
-
-  // =========================
-  // RETURN
-  // =========================
+      : Math.round((completedGoals / goals.length) * 100);
 
   return {
-
     goalText,
     setGoalText,
-
     goals,
-
     goalHistory,
-
     completedGoals,
     goalProgress,
-
     addGoal,
     toggleGoal,
     deleteGoal,
-
   };
-
 }
-
 
 export default useGoal;
