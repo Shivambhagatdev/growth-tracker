@@ -1,468 +1,244 @@
+
 import { useEffect, useState } from "react";
 import getTodayDate from "../utils/date";
 
 function useTasks() {
-
   const [task, setTask] = useState("");
-
-  const [priority, setPriority] =
-    useState("Medium");
-
-  const [dueDate, setDueDate] =
-    useState(getTodayDate());
+  const [priority, setPriority] = useState("Medium");
+  const [dueDate, setDueDate] = useState(getTodayDate());
 
   const [tasks, setTasks] = useState(() => {
-
-    const savedTasks =
-      localStorage.getItem("growthTasks");
-
-    return savedTasks
-      ? JSON.parse(savedTasks)
-      : [];
-
+    const savedTasks = localStorage.getItem("growthTasks");
+    return savedTasks ? JSON.parse(savedTasks) : [];
   });
 
-  const [editingTaskId, setEditingTaskId] =
-    useState(null);
-
-  const [editText, setEditText] =
-    useState("");
+  const [editingTaskId, setEditingTaskId] = useState(null);
+  const [editText, setEditText] = useState("");
 
   const [streak, setStreak] = useState(() => {
-
-    const savedStreak =
-      localStorage.getItem("growthStreak");
-
-    return savedStreak
-      ? Number(savedStreak)
-      : 0;
-
+    const savedStreak = localStorage.getItem("growthStreak");
+    return savedStreak ? Number(savedStreak) : 0;
   });
 
-  const [
-    lastCompletedDate,
-    setLastCompletedDate
-  ] = useState(() => {
+  const [lastCompletedDate, setLastCompletedDate] = useState(
+    () => localStorage.getItem("lastCompletedDate") || ""
+  );
 
-    return (
-      localStorage.getItem(
-        "lastCompletedDate"
-      ) || ""
-    );
-
-  });
-
-
-  // =========================
-  // SAVE TASKS
-  // =========================
-
+  // Save tasks whenever they change.
   useEffect(() => {
-
-    localStorage.setItem(
-      "growthTasks",
-      JSON.stringify(tasks)
-    );
-
+    localStorage.setItem("growthTasks", JSON.stringify(tasks));
   }, [tasks]);
 
-
-  // =========================
-  // SAVE STREAK
-  // =========================
-
+  // Save streak information.
   useEffect(() => {
+    localStorage.setItem("growthStreak", String(streak));
+    localStorage.setItem("lastCompletedDate", lastCompletedDate);
+  }, [streak, lastCompletedDate]);
 
-    localStorage.setItem(
-      "growthStreak",
-      streak
-    );
-
-    localStorage.setItem(
-      "lastCompletedDate",
-      lastCompletedDate
-    );
-
-  }, [
-    streak,
-    lastCompletedDate
-  ]);
-
-
-  // =========================
-  // CARRY FORWARD INCOMPLETE TASKS
-  // =========================
-
+  // Move unfinished tasks to the current day without changing
+  // their original creation date or historical completion date.
   useEffect(() => {
-
     const checkNewDay = () => {
+      const currentDate = getTodayDate();
 
-      const currentDate =
-        getTodayDate();
-
-
-      setTasks((prevTasks) => {
-
+      setTasks((previousTasks) => {
         let changed = false;
 
+        const updatedTasks = previousTasks.map((item) => {
+          // Backfill historical metadata for tasks created before this update.
+          const createdDate = item.createdDate || item.date;
 
-        const updatedTasks =
-          prevTasks.map((item) => {
+          const normalizedItem = {
+            ...item,
+            createdDate,
+            completedDate:
+              item.completedDate ??
+              (item.completed ? item.date : null),
+          };
 
+          // Completed tasks should remain in their historical date.
+          if (normalizedItem.completed) {
             if (
-              item.date === currentDate
+              normalizedItem.createdDate !== item.createdDate ||
+              normalizedItem.completedDate !== item.completedDate
             ) {
-
-              return item;
-
+              changed = true;
+              return normalizedItem;
             }
 
+            return item;
+          }
 
+          // An incomplete task already assigned to today needs no change.
+          if (normalizedItem.date === currentDate) {
             if (
-              item.completed
+              normalizedItem.createdDate !== item.createdDate ||
+              normalizedItem.completedDate !== item.completedDate
             ) {
-
-              return item;
-
+              changed = true;
+              return normalizedItem;
             }
 
+            return item;
+          }
 
-            changed = true;
+          changed = true;
 
+          return {
+            ...normalizedItem,
+            date: currentDate,
+            dueDate:
+              normalizedItem.dueDate &&
+              normalizedItem.dueDate >= currentDate
+                ? normalizedItem.dueDate
+                : currentDate,
+          };
+        });
 
-            return {
-
-              ...item,
-
-              date:
-                currentDate,
-
-              dueDate:
-                currentDate,
-
-            };
-
-          });
-
-
-        return changed
-          ? updatedTasks
-          : prevTasks;
-
+        return changed ? updatedTasks : previousTasks;
       });
 
+      // Refresh the default due date for newly added tasks.
+      setDueDate((previousDate) =>
+        previousDate < currentDate ? currentDate : previousDate
+      );
     };
-
 
     checkNewDay();
 
+    const interval = setInterval(checkNewDay, 60 * 1000);
 
-    const interval =
-      setInterval(
-        checkNewDay,
-        60 * 1000
-      );
-
-
-    return () => {
-
-      clearInterval(interval);
-
-    };
-
+    return () => clearInterval(interval);
   }, []);
 
-
-  // =========================
-  // ADD TASK
-  // =========================
-
+  // Add a new task.
   const addTask = () => {
+    if (!task.trim()) return;
 
-    if (task.trim() === "") {
-      return;
-    }
+    const today = getTodayDate();
 
     const newTask = {
-
       id: Date.now(),
-
       text: task.trim(),
-
       completed: false,
-
-      date: getTodayDate(),
-
-      priority: priority,
-
-      dueDate: dueDate,
-
+      date: today,
+      createdDate: today,
+      completedDate: null,
+      priority,
+      dueDate: dueDate || today,
     };
 
-    setTasks((prevTasks) => [
-
-      ...prevTasks,
-
-      newTask
-
-    ]);
+    setTasks((previousTasks) => [...previousTasks, newTask]);
 
     setTask("");
-
     setPriority("Medium");
-
-    setDueDate(getTodayDate());
-
+    setDueDate(today);
   };
 
-
-  // =========================
-  // UPDATE STREAK
-  // =========================
-
+  // Update the daily streak when a task is completed.
   const updateStreak = () => {
+    const today = getTodayDate();
 
-    const today =
-      getTodayDate();
+    if (lastCompletedDate === today) return;
 
-    if (
-      lastCompletedDate === today
-    ) {
-
-      return;
-
-    }
-
-    if (
-      lastCompletedDate === ""
-    ) {
-
+    if (!lastCompletedDate) {
       setStreak(1);
-
       setLastCompletedDate(today);
-
       return;
-
     }
 
-    const lastDate =
-      new Date(
-        lastCompletedDate +
-        "T00:00:00"
-      );
+    const lastDate = new Date(`${lastCompletedDate}T00:00:00`);
+    const currentDate = new Date(`${today}T00:00:00`);
+    const difference = currentDate - lastDate;
+    const daysDifference = Math.round(
+      difference / (1000 * 60 * 60 * 24)
+    );
 
-    const currentDate =
-      new Date(
-        today +
-        "T00:00:00"
-      );
-
-    const difference =
-      currentDate - lastDate;
-
-    const oneDay =
-      1000 *
-      60 *
-      60 *
-      24;
-
-    const daysDifference =
-      Math.round(
-        difference / oneDay
-      );
-
-    if (
-      daysDifference === 1
-    ) {
-
-      setStreak(
-        (prevStreak) =>
-          prevStreak + 1
-      );
-
-    } else {
-
-      setStreak(1);
-
-    }
+    setStreak((previousStreak) =>
+      daysDifference === 1 ? previousStreak + 1 : 1
+    );
 
     setLastCompletedDate(today);
-
   };
 
-
-  // =========================
-  // TOGGLE TASK
-  // =========================
-
+  // Complete or reopen a task.
   const toggleTask = (id) => {
+    const today = getTodayDate();
 
-    setTasks((prevTasks) =>
+    setTasks((previousTasks) =>
+      previousTasks.map((item) => {
+        if (item.id !== id) return item;
 
-      prevTasks.map((item) => {
+        const newCompleted = !item.completed;
 
-        if (
-          item.id === id
-        ) {
-
-          const newCompleted =
-            !item.completed;
-
-          if (
-            newCompleted
-          ) {
-
-            updateStreak();
-
-          }
-
-          return {
-
-            ...item,
-
-            completed:
-              newCompleted,
-
-          };
-
+        if (newCompleted) {
+          updateStreak();
         }
 
-        return item;
-
+        return {
+          ...item,
+          createdDate: item.createdDate || item.date,
+          completed: newCompleted,
+          completedDate: newCompleted ? today : null,
+        };
       })
-
     );
-
   };
 
-
-  // =========================
-  // DELETE TASK
-  // =========================
-
+  // Delete a task.
   const deleteTask = (id) => {
-
-    setTasks((prevTasks) =>
-
-      prevTasks.filter(
-        (item) =>
-          item.id !== id
-      )
-
+    setTasks((previousTasks) =>
+      previousTasks.filter((item) => item.id !== id)
     );
-
   };
 
-
-  // =========================
-  // START EDIT
-  // =========================
-
+  // Start editing.
   const startEdit = (item) => {
-
-    setEditingTaskId(
-      item.id
-    );
-
-    setEditText(
-      item.text
-    );
-
+    setEditingTaskId(item.id);
+    setEditText(item.text);
   };
 
-
-  // =========================
-  // SAVE EDIT
-  // =========================
-
+  // Save edited text.
   const saveEdit = (id) => {
+    if (!editText.trim()) return;
 
-    if (
-      editText.trim() === ""
-    ) {
-
-      return;
-
-    }
-
-    setTasks((prevTasks) =>
-
-      prevTasks.map((item) => {
-
-        if (
-          item.id === id
-        ) {
-
-          return {
-
-            ...item,
-
-            text:
-              editText.trim(),
-
-          };
-
-        }
-
-        return item;
-
-      })
-
+    setTasks((previousTasks) =>
+      previousTasks.map((item) =>
+        item.id === id
+          ? { ...item, text: editText.trim() }
+          : item
+      )
     );
 
     setEditingTaskId(null);
-
     setEditText("");
-
   };
 
-
-  // =========================
-  // CANCEL EDIT
-  // =========================
-
+  // Cancel editing.
   const cancelEdit = () => {
-
     setEditingTaskId(null);
-
     setEditText("");
-
   };
-
-
-  // =========================
-  // RETURN
-  // =========================
 
   return {
-
     task,
     setTask,
-
     priority,
     setPriority,
-
     dueDate,
     setDueDate,
-
     tasks,
-
     editingTaskId,
     editText,
     setEditText,
-
     streak,
-
     addTask,
     toggleTask,
     deleteTask,
-
     startEdit,
     saveEdit,
     cancelEdit,
-
   };
-
 }
 
 export default useTasks;
